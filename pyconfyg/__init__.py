@@ -1,1 +1,1 @@
-from .pyconfyg import PyConfyg, parse_strings
+from .pyconfyg import PyConfyg, parse_strings, Confyg

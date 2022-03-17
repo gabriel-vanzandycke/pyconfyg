@@ -1,5 +1,6 @@
 import ast
 import copy
+import functools
 import itertools
 import re
 import traceback
@@ -44,19 +45,20 @@ def parse_strings(*strings, env=None):
             env     - local environment to use
     """
     env = env or {}
-    for i, string in enumerate(strings):
+    for i, string in enumerate(strings): # pylint: disable=unused-variable
         #assert re.match(r"\w*=[\w\[\],'\"\(\)]*", string), \
         #    f"Failed parsing argument #{i}: \"{string}\". Only \"key=value\" are supported"
         _exec(string, None, env, description="parsable strings")
     return env
 
-class InterpreterError(Exception): pass
+class InterpreterError(Exception):
+    pass
 
 # from https://stackoverflow.com/a/28836286/1782553
 def _exec(cmd, globals=None, locals=None, description='source string'): # pylint: disable=redefined-builtin
     try:
         exec(cmd, globals, locals) # pylint: disable=exec-used
-    except (Exception, SyntaxError) as err:
+    except (Exception, SyntaxError) as err: # pylint: disable=broad-except
         error_class = err.__class__.__name__
         detail = err.args[0]
         tb = err.__traceback__
@@ -69,12 +71,17 @@ def _exec(cmd, globals=None, locals=None, description='source string'): # pylint
 class Confyg():
     def __init__(self, tree):
         self.tree = tree
-    def __str__(self):
+    @functools.cached_property
+    def string(self):
         return astunparse.unparse(self.tree)
+    @functools.cached_property
+    def dict(self):
+        return parse_strings(self.string)
     def __call__(self):
-        return parse_strings(str(self))
+        return self.dict
 
 class PyConfyg():
+    i = 0
     def __init__(self, config_file, grid_dict, kwargs_dict):
         with open(config_file) as f:
             tree = ast.parse(f.read())
@@ -82,7 +89,7 @@ class PyConfyg():
         unoverwritten = {}
         self.config_trees = tuple({
             tuple(overwrite.items()): Confyg(self._update_ast(tree, {**overwrite, **kwargs_dict}, unoverwritten))
-                             for overwrite in product_kwargs(**grid_dict)
+                             for overwrite in product_kwargs(**grid_dict or {})
         }.items())
         print("Unoverwritten config grid : ", list(unoverwritten.keys()))
 

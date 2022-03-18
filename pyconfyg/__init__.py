@@ -1,1 +1,3 @@
-from .pyconfyg import PyConfyg, parse_strings, Confyg
+from .core import Confyg, PyConfyg, parse_strings
+
+__all__ = ["Confyg", "PyConfyg", "parse_strings"]

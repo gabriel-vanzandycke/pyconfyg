@@ -22,14 +22,17 @@ def test_parse_strings4():
 def test_confyg():
     c = Confyg("a=2\nb=5")
     assert c.dict == {'a': 2, 'b': 5}
+    assert c.string == "\na = 2\nb = 5\n"
 
 def test_confyg_with_overwrite():
     c = Confyg("a=2\nb=5", {'b': 2})
     assert c.dict == {'a': 2, 'b': 2}
+    assert c.string == "\na = 2\nb = 2\n"
 
 def test_confyg_with_unoverwritten():
     c = Confyg("a=2\nb=5", {'c': 2})
     assert c.dict == {'a': 2, 'b': 5, 'c': 2}
+    assert c.string == "\na = 2\nb = 5\nc = 2\n"
 
 def test_gridconfyg():
     gc = GridConfyg("a=2\nb=5", {'b': [1,2]})

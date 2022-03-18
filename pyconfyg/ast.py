@@ -1,13 +1,18 @@
 import ast
+import logging
 from typing import Dict
 
+logger = logging.getLogger(__name__)
 
 def update_ast(
     tree: ast.Module,
-    overwrite: Dict,
+    overwrite: Dict = None,
     allow_double_assignation: bool = False,
     allow_tuple_assignation: bool = False,
 ):
+    if not overwrite:
+        return {}
+
     met_targets = []
     for node in tree.body:
         if not isinstance(node, ast.Assign):
@@ -35,4 +40,5 @@ def update_ast(
             )
         )
     ast.fix_missing_locations(tree)
+    logging.warning(f"Unoverwritten parameters : {list(overwrite.keys())}")
     return overwrite

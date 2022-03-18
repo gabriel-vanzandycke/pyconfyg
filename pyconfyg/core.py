@@ -6,20 +6,24 @@ import logging
 import os
 import re
 import traceback
-import warnings
-from typing import Any, Dict, Iterator, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterator, Optional, Tuple
 
 import astunparse
 
 from pyconfyg.ast import update_ast
 from pyconfyg.exceptions import InterpreterError
 
+# pylint: disable=logging-fstring-interpolation
+
+logger = logging.getLogger(__name__)
 
 def product_kwargs(**kwargs) -> Iterator[Dict]:
-    """Some documentation.
+    """ Transforms a dictionary of arguments (argument_name, list_of_values)
+        into an iterator over dictoraries or initial arguments and every
+        combination of their values.
 
-    :param kwargs: ................
-    :returns: Iterator of dict objects containing ................
+        :param kwargs: dict of name, lists
+        :returns: Iterator
     """
     kvs = []
     for k in kwargs:
@@ -44,16 +48,11 @@ def parse_strings(*strings: str, env=None) -> Dict[str, Any]:
     for i, string in enumerate(strings):  # pylint: disable=unused-variable
         # assert re.match(r"\w*=[\w\[\],'\"\(\)]*", string), \
         #    f"Failed parsing argument #{i}: \"{string}\". Only \"key=value\" are supported"
-        _exec(string, None, env, description="parsable strings")
+        _exec(string, None, env)
     return env
 
 
-def _exec(
-    cmd,
-    globals: Optional[Dict[str, Any]] = None,
-    locals: Optional[Dict[str, Any]] = None,
-    description: str = "source string",
-):  # pylint: disable=redefined-builtin
+def _exec(cmd, globals: Optional[Dict[str, Any]] = None, locals: Optional[Dict[str, Any]] = None):  # pylint: disable=redefined-builtin
     """Some documentation
 
     :param cmd: ................
@@ -75,15 +74,18 @@ def _exec(
         traceback.print_exception(type(err), err, tb)
     else:
         return
-    raise InterpreterError(
-        "%s at line %d of %s: %s\n%s"
-        % (error_class, line_number, description, detail, cmd)
-    )
+    raise InterpreterError(f"{error_class} at line {line_number}: {detail}\n{cmd}")
 
 
 class Confyg:
-    def __init__(self, tree: ast.Module):
-        self.tree = tree
+    def __init__(self, config, overwrite: Optional[Dict] = None):
+        """Some documentation here
+
+        :param config: ................
+        :param overwrite: ................
+        """
+        self.tree = load_tree(config)
+        update_ast(self.tree, overwrite)
 
     @functools.cached_property
     def string(self):
@@ -96,81 +98,53 @@ class Confyg:
     def __call__(self):
         return self.dict
 
-
-class _PyConfigIterator:
-    def __init__(self, config_trees: Sequence[Tuple[Tuple, Confyg]]):
+class _GridConfygIterator:
+    def __init__(self, config_trees: Dict[Tuple, Confyg]):
         # make a copy of the iterable in order to avoid issues related to
         # the iterable being modified/accessed while iterating over it
         self._config_trees = copy.deepcopy(config_trees)
+        self._keys = list(self._config_trees.keys())
         self._i = 0
 
-    def __iter__(self) -> "_PyConfigIterator":
+    def __iter__(self) -> "_GridConfygIterator":
         return self
 
     def __next__(self) -> Tuple[Dict, Confyg]:
         try:
-            key, confyg = self._config_trees[self._i]
+            key = self._keys[self._i]
+            confyg = self._config_trees[key]
             self._i += 1
-        except IndexError:
-            raise StopIteration()
-        else:
             return dict(key), confyg
+        except IndexError:
+            raise StopIteration() # pylint: disable=raise-missing-from
 
+def load_tree(config) -> ast.Module:
+    if os.path.isfile(config):
+        logger.info(f"Loading config from file: {config}")
+        with open(config) as config:
+            config = config.read()
+    if isinstance(config, str):
+        config = ast.parse(config)
+    return config
 
-class PyConfyg:
-    def __init__(
-        self,
-        config_file: str,
-        grid_dict: Optional[Dict] = None,
-        kwargs_dict: Optional[Dict] = None,
-    ):
+class GridConfyg:
+    def __init__(self, config, grid: Optional[Dict] = None, overwrite: Optional[Dict] = None):
         """Some documentation here
 
-        :param config_file: ................
-        :param grid_dict: ................
-        :param kwargs_dict: ................
+        :param config: ................
+        :param overwrite: ................
         """
-        self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
-        grid_dict = grid_dict if grid_dict is not None else {}
-        kwargs_dict = kwargs_dict if kwargs_dict is not None else {}
+        tree = load_tree(config)
 
-        if os.path.isfile(config_file):
-            self.logger.info(f"Loading config file from {config_file}")
-            config_file = self._load_config_file(config_file)
-
-        tree = ast.parse(config_file)
-
-        config_trees = {}
-        for overwrite in product_kwargs(**grid_dict):
-            key = tuple(overwrite.items())
-            value = Confyg(self._update_ast(tree, {**overwrite, **kwargs_dict}))
-            config_trees[key] = value
-        self.config_trees = tuple(config_trees.items())
-
-    @classmethod
-    def _load_config_file(cls, config_file: str) -> str:
-        try:
-            with open(config_file, "r") as f:
-                config_file = f.read()
-        except FileNotFoundError:
-            # handle file not found error here
-            raise
-        except IOError:
-            # handle IO error here
-            raise
-        return config_file
-
-    @staticmethod
-    def _update_ast(config_tree: ast.Module, grid_sample: Dict):
-        unoverwritten = {}
-        tree = copy.deepcopy(config_tree)
-        unoverwritten.update(**update_ast(tree, grid_sample))
-        warnings.warn(f"Unoverwritten config grid : {list(unoverwritten.keys())}")
-
-        return tree
+        self.config_trees = {}
+        for grid_sample in product_kwargs(**grid):
+            key = tuple(grid_sample.items())
+            value = Confyg(copy.deepcopy(tree), {**grid_sample, **overwrite})
+            self.config_trees[key] = value
 
     def __len__(self) -> int:
         return len(self.config_trees)
 
-    def __iter__(self) -> _PyConfigIterator:
-        return _PyConfigIterator(self.config_trees)
+    def __iter__(self) -> _GridConfygIterator:
+        return _GridConfygIterator(self.config_trees)
+

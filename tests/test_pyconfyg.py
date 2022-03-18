@@ -1,4 +1,4 @@
-from pyconfyg import PyConfyg, Confyg, parse_strings
+from pyconfyg import GridConfyg, Confyg, parse_strings
 
 import io
 

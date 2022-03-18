@@ -4,8 +4,11 @@ import functools
 import itertools
 import re
 import traceback
+import warnings
 
 import astunparse
+
+from .exceptions import InterpreterError
 
 
 def update_ast(tree, overwrite, allow_double_assignation=False, allow_tuple_assignation=False):
@@ -42,7 +45,8 @@ def parse_strings(*strings, env=None):
         of the created symbols and their value.
         Arguments:
             strings - strings to be parsed
-            env     - local environment to use
+            env     - local environment to use. variables defined in strings
+                overwrite the ones defined in environment
     """
     env = env or {}
     for i, string in enumerate(strings): # pylint: disable=unused-variable
@@ -50,9 +54,6 @@ def parse_strings(*strings, env=None):
         #    f"Failed parsing argument #{i}: \"{string}\". Only \"key=value\" are supported"
         _exec(string, None, env, description="parsable strings")
     return env
-
-class InterpreterError(Exception):
-    pass
 
 # from https://stackoverflow.com/a/28836286/1782553
 def _exec(cmd, globals=None, locals=None, description='source string'): # pylint: disable=redefined-builtin
@@ -83,21 +84,21 @@ class Confyg():
 class PyConfyg():
     i = 0
     def __init__(self, config_file, grid_dict, kwargs_dict):
-        with open(config_file) as f:
-            tree = ast.parse(f.read())
-
-        unoverwritten = {}
+        fd = open(config_file, 'r') if isinstance(config_file, str) else config_file
+        tree = ast.parse(fd.read())
+        if isinstance(config_file, str):
+            fd.close()
         self.config_trees = tuple({
-            tuple(overwrite.items()): Confyg(self._update_ast(tree, {**overwrite, **kwargs_dict}, unoverwritten))
+            tuple(overwrite.items()): Confyg(self._update_ast(tree, {**overwrite, **kwargs_dict}))
                              for overwrite in product_kwargs(**grid_dict or {})
         }.items())
-        print("Unoverwritten config grid : ", list(unoverwritten.keys()))
 
     @staticmethod
-    def _update_ast(config_tree, grid_sample, unoverwritten=None):
-        unoverwritten = {} if unoverwritten is None else unoverwritten
+    def _update_ast(config_tree, grid_sample):
+        unoverwritten = {}
         tree = copy.deepcopy(config_tree)
         unoverwritten.update(**update_ast(tree, grid_sample))
+        warnings.warn("Unoverwritten config grid : ", list(unoverwritten.keys()))
         return tree
 
     def __iter__(self):

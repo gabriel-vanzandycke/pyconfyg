@@ -5,8 +5,8 @@ from typing import Dict
 def update_ast(
     tree: ast.Module,
     overwrite: Dict,
-    allow_double_assignation=False,
-    allow_tuple_assignation=False,
+    allow_double_assignation: bool = False,
+    allow_tuple_assignation: bool = False,
 ):
     met_targets = []
     for node in tree.body:
@@ -14,7 +14,6 @@ def update_ast(
             continue
         for target in node.targets:
             if hasattr(target, "id"):
-                # maybe raise a custom exception here instead of asserting
                 assert allow_tuple_assignation or isinstance(
                     target, ast.Name
                 ), "Tuple assignation is not allowed in config files (e.g. `a,b=1,2`). Impossible to overwrite '{}' of type '{}'".format(
@@ -28,7 +27,6 @@ def update_ast(
                 if target.id in overwrite:
                     node.value = ast.parse(repr(overwrite.pop(target.id))).body[0].value
                     met_targets.append(target.id)
-
     # Add remaining keys
     for key, value in overwrite.items():
         tree.body.append(

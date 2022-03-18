@@ -3,8 +3,10 @@ import copy
 import functools
 import itertools
 import logging
+import os
 import re
 import traceback
+import warnings
 from typing import Any, Dict, Iterator, Optional, Sequence, Tuple
 
 import astunparse
@@ -31,11 +33,12 @@ def product_kwargs(**kwargs) -> Iterator[Dict]:
 
 
 def parse_strings(*strings: str, env=None) -> Dict[str, Any]:
-    """Parses strings of 'k=v' by using builtin exec and returns a dictionary
-    of the created symbols and their value.
-    Arguments:
-        strings - strings to be parsed
-        env     - local environment to use
+    """ Parses strings of 'k=v' by using builtin exec and returns a dictionary
+        of the created symbols and their value.
+        Arguments:
+            strings - strings to be parsed
+            env     - local environment to use. variables defined in strings
+                overwrite the ones defined in environment
     """
     env = env or {}
     for i, string in enumerate(strings):  # pylint: disable=unused-variable
@@ -117,13 +120,13 @@ class _PyConfigIterator:
 class PyConfyg:
     def __init__(
         self,
-        config_str: str,
+        config_file: str,
         grid_dict: Optional[Dict] = None,
         kwargs_dict: Optional[Dict] = None,
     ):
         """Some documentation here
 
-        :param config_str: ................
+        :param config_file: ................
         :param grid_dict: ................
         :param kwargs_dict: ................
         """
@@ -131,39 +134,39 @@ class PyConfyg:
         grid_dict = grid_dict if grid_dict is not None else {}
         kwargs_dict = kwargs_dict if kwargs_dict is not None else {}
 
-        tree = ast.parse(config_str)
+        if os.path.isfile(config_file):
+            self.logger.info(f"Loading config file from {config_file}")
+            config_file = self._load_config_file(config_file)
 
-        unoverwritten = {}
+        tree = ast.parse(config_file)
+
         config_trees = {}
         for overwrite in product_kwargs(**grid_dict):
             key = tuple(overwrite.items())
-            value = Confyg(
-                self._update_ast(tree, {**overwrite, **kwargs_dict}, unoverwritten)
-            )
+            value = Confyg(self._update_ast(tree, {**overwrite, **kwargs_dict}))
             config_trees[key] = value
         self.config_trees = tuple(config_trees.items())
 
-        self.logger.info("Unoverwritten config grid : ", list(unoverwritten.keys()))
-
     @classmethod
-    def from_file(
-        cls, config_path: str, grid_dict: Dict, kwargs_dict: Dict
-    ) -> "PyConfyg":
+    def _load_config_file(cls, config_file: str) -> str:
         try:
-            with open(config_path, "r") as f:
-                config_str = f.read()
+            with open(config_file, "r") as f:
+                config_file = f.read()
         except FileNotFoundError:
             # handle file not found error here
             raise
         except IOError:
             # handle IO error here
             raise
-        return cls(config_str, grid_dict, kwargs_dict)
+        return config_file
 
     @staticmethod
-    def _update_ast(config_tree: ast.Module, grid_sample: Dict, unoverwritten: Dict):
+    def _update_ast(config_tree: ast.Module, grid_sample: Dict):
+        unoverwritten = {}
         tree = copy.deepcopy(config_tree)
         unoverwritten.update(**update_ast(tree, grid_sample))
+        warnings.warn(f"Unoverwritten config grid : {list(unoverwritten.keys())}")
+
         return tree
 
     def __len__(self) -> int:

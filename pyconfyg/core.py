@@ -119,7 +119,7 @@ class _GridConfygIterator:
             raise StopIteration() # pylint: disable=raise-missing-from
 
 def load_tree(config) -> ast.Module:
-    if os.path.isfile(config):
+    if isinstance(config, str) and os.path.isfile(config):
         logger.info(f"Loading config from file: {config}")
         with open(config) as config:
             config = config.read()
@@ -135,6 +135,8 @@ class GridConfyg:
         :param overwrite: ................
         """
         tree = load_tree(config)
+        grid = grid if grid is not None else {}
+        overwrite = overwrite if overwrite is not None else {}
 
         self.config_trees = {}
         for grid_sample in product_kwargs(**grid):

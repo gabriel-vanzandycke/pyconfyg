@@ -1,7 +1,5 @@
 from pyconfyg import GridConfyg, Confyg, parse_strings
 
-import io
-
 def test_parse_strings_single():
     assert parse_strings("a=2") == {'a': 2}
 

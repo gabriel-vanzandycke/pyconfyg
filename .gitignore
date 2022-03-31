@@ -1,3 +1,4 @@
 pyconfyg.egg-info
-pyconfyg/__pycache__
+__pycache__
 build/
+dist/

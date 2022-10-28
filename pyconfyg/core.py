@@ -51,6 +51,8 @@ def parse_strings(*strings: str, env=None) -> Dict[str, Any]:
         _exec(string, None, env)
     return env
 
+def insert_line_numbers(txt):
+    return "\n".join([f"{n+1:03d}.\t{line}" for n, line in enumerate(txt.split("\n"))])
 
 def _exec(cmd, globals: Optional[Dict[str, Any]] = None, locals: Optional[Dict[str, Any]] = None):  # pylint: disable=redefined-builtin
     """Some documentation
@@ -125,6 +127,8 @@ def load_tree(config) -> ast.Module:
             config = config.read()
     if isinstance(config, str):
         config = ast.parse(config)
+    elif not isinstance(config, ast.Module):
+        raise FileNotFoundError(config)
     return config
 
 class GridConfyg:

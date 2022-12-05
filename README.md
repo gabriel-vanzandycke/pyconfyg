@@ -9,7 +9,7 @@ key = "a"
 value = {
   "a": 12,
   "b": 42,
-}[k]
+}[key]
 ```
 
 ## Usage

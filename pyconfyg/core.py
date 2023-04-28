@@ -76,7 +76,8 @@ def _exec(cmd, globals: Optional[Dict[str, Any]] = None, locals: Optional[Dict[s
         traceback.print_exception(type(err), err, tb)
     else:
         return
-    raise InterpreterError(f"{error_class} at line {line_number}: {detail}\n{cmd}")
+    line = cmd.split('\n')[line_number-1]
+    raise InterpreterError(f"{error_class} at line {line_number}: {detail}\n\t'''{line}'''")
 
 
 class Confyg:

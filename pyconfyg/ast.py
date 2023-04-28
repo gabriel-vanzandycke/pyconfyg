@@ -1,8 +1,13 @@
 import ast
+from functools import lru_cache
 import logging
 from typing import Dict
 
 logger = logging.getLogger(__name__)
+
+@lru_cache(None)
+def warn_once(msg):
+    logger.warning(msg)
 
 def update_ast(
     tree: ast.Module,
@@ -40,5 +45,5 @@ def update_ast(
             )
         )
     ast.fix_missing_locations(tree)
-    logging.warning(f"Unoverwritten parameters : {list(overwrite.keys())}")
+    warn_once(f"Unoverwritten parameters : {list(overwrite.keys())}")
     return overwrite
